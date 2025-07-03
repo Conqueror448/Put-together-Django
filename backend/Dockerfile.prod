@@ -1,0 +1,52 @@
+###########
+# BUILDER #
+###########
+FROM python:3.11-slim AS builder
+
+WORKDIR /usr/src/app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# --- ONLY CHANGE IS ON THE NEXT TWO LINES ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-dev gcc libffi-dev \
+    && rm -rf /var/lib/apt/lists/*          # keep image slim
+# -------------------------------------------
+
+RUN pip install --upgrade pip
+COPY . .
+COPY ./requirements ./requirements
+RUN pip wheel --no-cache-dir --no-deps \
+        --wheel-dir /usr/src/app/wheels \
+        -r requirements/production.txt
+
+
+#########
+# FINAL #
+#########
+FROM python:3.11-slim
+
+RUN useradd -ms /bin/bash app
+ENV HOME=/home/app \
+    APP_HOME=/home/app/web
+
+RUN mkdir -p $APP_HOME/api/static
+WORKDIR $APP_HOME
+
+# --- SAME CHANGE HERE ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-dev gcc libffi-dev netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+# ------------------------
+
+COPY --from=builder /usr/src/app/wheels /wheels
+COPY --from=builder /usr/src/app/requirements/production.txt .
+RUN pip install --no-cache /wheels/*
+
+COPY ./entrypoint.prod.sh $APP_HOME
+COPY . $APP_HOME
+
+RUN chown -R app:app $APP_HOME
+USER app
+
+ENTRYPOINT ["/home/app/web/entrypoint.prod.sh"]
