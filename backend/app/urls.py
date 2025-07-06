@@ -19,7 +19,12 @@ from django.urls import path
 from django.urls import re_path, include
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    re_path(r'^inventory/', include('inventory.urls')),
+    path("admin/", admin.site.urls),
+
+    # inventory screens
+    path("inventory/", include("inventory.urls")),
+
+    # <-- add this line
+    path("accounts/", include("django.contrib.auth.urls")),
 ]
 
